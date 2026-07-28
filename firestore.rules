@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // El rol vive en /usuarios/{uid}, no en el token — así se puede
+    // cambiar el rol de alguien sin que tenga que volver a loguearse
+    // con un custom claim nuevo.
+    function rol() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+    }
+
+    function esAdministracion() {
+      return isSignedIn() && rol() == 'administracion';
+    }
+
+    // Único módulo al que entra un Empleado: puede leer todo (para ver
+    // el estado de sus propios pedidos) y crear solicitudes nuevas, pero
+    // no aprobar/rechazar/anular ni tocar nada más de la app.
+    match /solicitudesCombustible/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if esAdministracion();
+    }
+
+    // Un usuario puede leer su propio perfil (para saber su rol); crear
+    // y editar usuarios queda reservado a Administración.
+    match /usuarios/{uid} {
+      allow read: if isSignedIn();
+      allow write: if esAdministracion();
+    }
+
+    // El contador de Solicitudes lo toca cualquier usuario logueado (es
+    // parte de la misma transacción que crea la solicitud); el resto de
+    // los contadores (órdenes, etc.) son de uso exclusivo de Administración.
+    match /contadores/solicitudes {
+      allow read, write: if isSignedIn();
+    }
+
+    // Un Empleado necesita leer Activos y Centros de costo para completar
+    // el formulario de Solicitudes, aunque no pueda editarlos.
+    match /activos/{id} {
+      allow read: if isSignedIn();
+      allow write: if esAdministracion();
+    }
+    match /centrosCosto/{id} {
+      allow read: if isSignedIn();
+      allow write: if esAdministracion();
+    }
+    match /preciosCombustible/{id} {
+      allow read: if isSignedIn();
+      allow write: if esAdministracion();
+    }
+
+    match /{document=**} {
+      allow read, write: if esAdministracion();
+    }
+  }
+}

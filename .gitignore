@@ -1,0 +1,13 @@
+# Dependencias — se reinstalan con "npm install", no hace falta subirlas
+node_modules/
+
+# Variables de entorno con claves secretas de Firebase — nunca a un repo
+.env
+.env.local
+
+# Carpeta de build de Vite
+frontend/dist/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
