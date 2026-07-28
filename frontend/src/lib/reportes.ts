@@ -16,25 +16,26 @@ export interface FilaReporte {
   estado?: string;
 }
 
+export type FuenteReporte = 'solicitudes' | 'ordenes' | 'entregas';
+
 export interface FiltrosReporte {
+  fuente: FuenteReporte;
   desde?: number;
   hasta?: number;
   centroCostoId?: string;
   activoCodigo?: string;
 }
 
-// Junta las tres fuentes en un único "libro mayor" de combustible para
-// reportear — es la vista consolidada que pedías, sin tener que mirar
-// tres pantallas distintas.
+// Antes juntaba Solicitudes + Órdenes + Entregas en un solo listado, pero
+// eso duplica el litraje: una Orden de Carga sale de una Solicitud, así
+// que son el mismo litro contado dos veces. Ahora hay que elegir UNA
+// fuente por vez — es la corrección que pediste.
 export async function obtenerFilasReporte(filtros: FiltrosReporte): Promise<FilaReporte[]> {
-  const [solicitudes, ordenes, movimientos] = await Promise.all([
-    listarSolicitudes(),
-    listarOrdenes(),
-    listarMovimientosBatan(),
-  ]);
+  let filas: FilaReporte[] = [];
 
-  let filas: FilaReporte[] = [
-    ...solicitudes.map((s) => ({
+  if (filtros.fuente === 'solicitudes') {
+    const solicitudes = await listarSolicitudes();
+    filas = solicitudes.map((s) => ({
       fecha: s.fecha,
       tipo: 'Solicitud' as const,
       numero: `SC-${String(s.numero ?? 0).padStart(6, '0')}`,
@@ -43,8 +44,10 @@ export async function obtenerFilasReporte(filtros: FiltrosReporte): Promise<Fila
       centroCostoNombre: s.centroCostoNombre,
       litros: s.litrosSolicitados,
       estado: s.estado,
-    })),
-    ...ordenes.map((o) => ({
+    }));
+  } else if (filtros.fuente === 'ordenes') {
+    const ordenes = await listarOrdenes();
+    filas = ordenes.map((o) => ({
       fecha: o.fecha,
       tipo: 'Orden de carga' as const,
       numero: `OC-${String(o.numero ?? 0).padStart(6, '0')}`,
@@ -53,8 +56,10 @@ export async function obtenerFilasReporte(filtros: FiltrosReporte): Promise<Fila
       centroCostoNombre: o.centroCostoNombre,
       litros: o.cantidadAutorizada,
       estado: o.estado,
-    })),
-    ...movimientos.map((m) => ({
+    }));
+  } else {
+    const movimientos = await listarMovimientosBatan();
+    filas = movimientos.map((m) => ({
       fecha: m.fecha,
       tipo: 'Entrega Batán' as const,
       numero: '—',
@@ -63,8 +68,8 @@ export async function obtenerFilasReporte(filtros: FiltrosReporte): Promise<Fila
       centroCostoNombre: m.centroCostoNombre,
       litros: m.litrosEntregados,
       estado: undefined,
-    })),
-  ];
+    }));
+  }
 
   if (filtros.desde) filas = filas.filter((f) => f.fecha >= filtros.desde!);
   if (filtros.hasta) filas = filas.filter((f) => f.fecha <= filtros.hasta!);

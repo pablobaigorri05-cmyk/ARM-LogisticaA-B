@@ -123,6 +123,8 @@ cualquier lectura o escritura — sin login, la app no trae ni un dato.
   - Los mismos indicadores (promedio y últimas cargas) también aparecen en la ficha de cada activo (botón "Rendimiento" en Activos), y el conteo de alertas está en el Dashboard.
 - **Identidad visual de Armegom**: tipografía de títulos Manrope, acento **teal** en botones primarios, chips activos, sidebar y login (antes gris plano), logo real de la empresa en el sidebar, en el login y como favicon, y pie de página "Desarrollado por Cr. Baigorri Pablo · Estudio A&B Servicios Contables" en todas las pantallas internas y en el login.
 - **Los PDF también llevan la marca**: el listado y ficha de Activos, la orden de carga para el proveedor y el reporte de combustible tienen el logo real en el encabezado, el mismo verde teal en títulos/encabezados de tabla, y el mismo pie de página con numeración — quedan con formato consistente con el resto de la app.
+- **Usuarios**: ahora se puede editar el rol y activar/desactivar a un usuario existente (antes solo se podía crear), y mandar un mail de "restablecer contraseña" sin necesitar acceso al Admin SDK de Firebase. Un usuario desactivado ya no puede usar la app aunque su login siga siendo válido. La pantalla también muestra en texto plano qué puede hacer cada rol.
+- **Reporte de Centros de costo corregido**: antes juntaba Solicitudes + Órdenes de carga + Entregas del Batán en un solo listado, duplicando el litraje (una Orden sale de una Solicitud, es el mismo litro contado dos veces). Ahora hay que elegir **una sola fuente** por vez (Solicitudes, Órdenes de carga, o Entregas del Batán) antes de filtrar.
 
 **Pendiente:**
 - Choferes/operadores, Taller, Documentación, Indicadores más completos

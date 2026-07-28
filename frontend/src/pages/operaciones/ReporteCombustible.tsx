@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { obtenerFilasReporte, exportarReporteExcel, exportarReportePDF, FilaReporte } from '../../lib/reportes';
+import { obtenerFilasReporte, exportarReporteExcel, exportarReportePDF, FilaReporte, FuenteReporte } from '../../lib/reportes';
 import { listarCentrosCosto } from '../../lib/centrosCosto';
 import { listarActivos } from '../../lib/activos';
 
+const fuenteLabel: Record<FuenteReporte, string> = {
+  solicitudes: 'Solicitudes',
+  ordenes: 'Órdenes de carga',
+  entregas: 'Entregas del Batán',
+};
+
 export function ReporteCombustible() {
-  const [filtros, setFiltros] = useState({ desde: '', hasta: '', centroCostoId: '', activoCodigo: '' });
+  const [filtros, setFiltros] = useState({ fuente: 'ordenes' as FuenteReporte, desde: '', hasta: '', centroCostoId: '', activoCodigo: '' });
   const [filas, setFilas] = useState<FilaReporte[] | null>(null);
 
   const centrosQ = useQuery({ queryKey: ['centrosCosto'], queryFn: listarCentrosCosto });
@@ -14,6 +20,7 @@ export function ReporteCombustible() {
   const buscar = useMutation({
     mutationFn: () =>
       obtenerFilasReporte({
+        fuente: filtros.fuente,
         desde: filtros.desde ? new Date(filtros.desde).getTime() : undefined,
         hasta: filtros.hasta ? new Date(filtros.hasta).getTime() + 86_400_000 - 1 : undefined,
         centroCostoId: filtros.centroCostoId || undefined,
@@ -24,22 +31,28 @@ export function ReporteCombustible() {
 
   const centroNombre = centrosQ.data?.find((c) => c.id === filtros.centroCostoId)?.nombre;
   const filtrosLabel = [
+    fuenteLabel[filtros.fuente],
     filtros.desde && `Desde ${new Date(filtros.desde).toLocaleDateString('es-AR')}`,
     filtros.hasta && `hasta ${new Date(filtros.hasta).toLocaleDateString('es-AR')}`,
     centroNombre && `Centro de costo: ${centroNombre}`,
     filtros.activoCodigo && `Activo: ${filtros.activoCodigo}`,
-  ].filter(Boolean).join(' · ') || 'Sin filtros aplicados';
+  ].filter(Boolean).join(' · ');
 
   return (
     <div>
       <p className="mb-4 text-sm text-slate-500">
-        Junta Solicitudes, Órdenes de carga y Entregas del Batán en un solo listado filtrable.
+        Elegí UNA fuente de datos por vez: una Orden de Carga sale de una Solicitud, así que mezclar las dos
+        duplicaría el litraje del mismo pedido.
       </p>
 
       <form
         onSubmit={(e) => { e.preventDefault(); buscar.mutate(); }}
-        className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-5"
+        className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-6"
       >
+        <select value={filtros.fuente} onChange={(e) => setFiltros({ ...filtros, fuente: e.target.value as FuenteReporte })}
+          className="rounded-md border border-teal-300 bg-teal-50 px-2 py-1.5 text-sm font-medium text-teal-800">
+          {Object.entries(fuenteLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
         <label className="flex flex-col text-xs text-slate-500">
           Desde
           <input type="date" value={filtros.desde} onChange={(e) => setFiltros({ ...filtros, desde: e.target.value })}
