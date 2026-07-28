@@ -104,7 +104,7 @@ export function TransferenciasPage() {
           <select required value={form.activoDestinoId} onChange={(e) => setForm({ ...form, activoDestinoId: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
             <option value="">Activo destino...</option>
-            {activosQ.data?.filter((a) => a.id !== batan.id).map((a) => <option key={a.id} value={a.id}>{a.codigoInterno} · {a.nombre}</option>)}
+            {activosQ.data?.filter((a) => a.id !== batan.id && a.estado !== 'baja').map((a) => <option key={a.id} value={a.id}>{a.codigoInterno} · {a.nombre}</option>)}
           </select>
           <input required type="number" placeholder="Litros entregados" value={form.litros}
             onChange={(e) => setForm({ ...form, litros: e.target.value })}

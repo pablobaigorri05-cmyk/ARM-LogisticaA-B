@@ -3,7 +3,7 @@
 // simplemente el id del doc relacionado guardado como string.
 
 export type CategoriaActivo = 'automoviles' | 'camionetas' | 'maquinas' | 'otros';
-export type EstadoActivo = 'activo' | 'baja' | 'en_mantenimiento' | 'inactivo';
+export type EstadoActivo = 'activo' | 'en_mantenimiento' | 'fuera_de_servicio' | 'alquilado' | 'baja';
 export type UnidadMedidaConsumo = 'km' | 'horas' | 'no_aplica';
 
 export const SUBGRUPOS: Record<CategoriaActivo, string[]> = {
@@ -48,21 +48,34 @@ export interface Activo {
   numeroChasis?: string;
   numeroMotor?: string;
   patente?: string; // "Domio" en el formulario real, vacío si no aplica
+  tipoCombustible?: TipoCombustibleCarga;
   capacidadTanqueLitros?: number;
   unidadMedidaConsumo: UnidadMedidaConsumo;
+  odometroInicial?: number;
   odometroHorometroActual?: number;
   estado: EstadoActivo;
   centroCostoId?: string;
   centroCostoNombre?: string; // desnormalizado para no tener que hacer join al listar
+  responsableNombre?: string;
+  observaciones?: string;
+  propietarioId?: string;
+  propietarioNombre?: string;
+  proveedorHabitualId?: string;
+  proveedorHabitualNombre?: string;
   fechaAlta?: number;
+  fechaBaja?: number;
   lugarCompra?: string;
   titular?: string; // razón social a nombre de quién está el activo (ej. "ARMEGOM SA")
   // Fechas de vencimiento, no booleanos: "vigente" = vencimiento > hoy,
-  // calculado al vuelo (ver nota en modelo-datos-combustible.md).
+  // calculado al vuelo (ver nota en modelo-datos-combustible.md). El costo
+  // de cada uno es opcional, para poder sacar el gasto anual por activo.
   seguroVencimiento?: number;
+  costoSeguro?: number;
   vtvVencimiento?: number;
+  costoVtv?: number;
   ultimoServiceFecha?: number;
   proximoServiceFecha?: number;
+  costoService?: number;
   // El Batán (y cualquier otro tanque móvil futuro) es un Activo más, no
   // una tabla aparte — estos tres campos solo se completan cuando
   // esTanqueMovil = true.
@@ -71,6 +84,14 @@ export interface Activo {
   stockActualLitros?: number;
   createdAt?: number;
 }
+
+export const ESTADO_LABEL: Record<EstadoActivo, string> = {
+  activo: 'Activo',
+  en_mantenimiento: 'En mantenimiento',
+  fuera_de_servicio: 'Fuera de servicio',
+  alquilado: 'Alquilado',
+  baja: 'De baja',
+};
 
 export function estaVigente(vencimiento?: number): boolean {
   return !!vencimiento && vencimiento > Date.now();
@@ -150,6 +171,28 @@ export interface Proveedor {
   cuit?: string;
   contacto?: string;
   activo: boolean;
+}
+
+// Catálogo simple: de quién es el activo (empresa propia, alquilado,
+// de un cliente, de un contratista). Editable desde Configuración para
+// no tener que escribir el nombre a mano cada vez.
+export interface Propietario {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
+// Un registro por cada campo modificado en un Activo — la auditoría que
+// pedía el módulo: quién cambió qué, cuándo, y de qué valor a qué valor.
+export interface HistorialCambioActivo {
+  id: string;
+  activoId: string;
+  usuarioEmail?: string;
+  usuarioNombre?: string;
+  fecha: number;
+  campo: string;
+  valorAnterior: string;
+  valorNuevo: string;
 }
 
 // ==================== Solicitudes de Combustible → Órdenes de Carga ====================

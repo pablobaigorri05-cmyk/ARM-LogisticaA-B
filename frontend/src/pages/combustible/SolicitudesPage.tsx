@@ -122,7 +122,7 @@ export function SolicitudesPage() {
           <select required value={form.activoId} onChange={(e) => setForm({ ...form, activoId: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
             <option value="">Activo...</option>
-            {activosQ.data?.map((a) => <option key={a.id} value={a.id}>{a.codigoInterno} · {a.nombre}</option>)}
+            {activosQ.data?.filter((a) => a.estado !== 'baja').map((a) => <option key={a.id} value={a.id}>{a.codigoInterno} · {a.nombre}</option>)}
           </select>
           <select required value={form.centroCostoId} onChange={(e) => setForm({ ...form, centroCostoId: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">

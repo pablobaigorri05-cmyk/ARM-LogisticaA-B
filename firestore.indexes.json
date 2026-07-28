@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "historialActivos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

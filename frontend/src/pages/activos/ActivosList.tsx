@@ -1,18 +1,31 @@
 import { useMemo, useState, useRef, Fragment } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { actualizarActivo, crearActivo, listarActivos } from '../../lib/activos';
+import { actualizarActivo, crearActivo, eliminarActivoFisico, listarActivos } from '../../lib/activos';
 import { leerExcelActivos, importarActivosEnLote, FilaImportada } from '../../lib/importarActivos';
-import { CATEGORIA_LABEL, CategoriaActivo, SUBGRUPOS, MARCAS, estaVigente, venceProntoOVencido, Activo, EstadoActivo } from '../../lib/types';
+import { listarCentrosCosto } from '../../lib/centrosCosto';
+import { listarPropietarios, seedPropietarios, crearPropietario } from '../../lib/propietarios';
+import { listarHistorialActivo, registrarCambiosActivo } from '../../lib/historialActivos';
+import { exportarActivosExcel, exportarActivosPDF, generarFichaActivoPDF } from '../../lib/exportActivos';
+import { useAuth } from '../../context/AuthContext';
+import {
+  CATEGORIA_LABEL, CategoriaActivo, SUBGRUPOS, MARCAS, ESTADO_LABEL, EstadoActivo,
+  estaVigente, venceProntoOVencido, Activo, TipoCombustibleCarga,
+} from '../../lib/types';
+
+const combustibleLabel: Record<TipoCombustibleCarga, string> = {
+  diesel: 'Diesel', nafta: 'Nafta', gnc: 'GNC', urea: 'Urea', agua_destilada: 'Agua destilada',
+};
 
 function toDateInput(ms?: number) {
   return ms ? new Date(ms).toISOString().slice(0, 10) : '';
 }
 
-const estadoClass: Record<string, string> = {
+const estadoClass: Record<EstadoActivo, string> = {
   activo: 'bg-green-50 text-green-700',
   baja: 'bg-red-50 text-red-700',
   en_mantenimiento: 'bg-amber-50 text-amber-700',
-  inactivo: 'bg-slate-100 text-slate-500',
+  fuera_de_servicio: 'bg-slate-100 text-slate-500',
+  alquilado: 'bg-blue-50 text-blue-700',
 };
 
 const emptyForm = {
@@ -27,6 +40,13 @@ const emptyForm = {
   numeroMotor: '',
   patente: '',
   lugarCompra: '',
+  tipoCombustible: 'diesel' as TipoCombustibleCarga,
+  capacidadTanqueLitros: '',
+  odometroInicial: '',
+  responsableNombre: '',
+  observaciones: '',
+  centroCostoId: '',
+  propietarioId: '',
   seguroVencimiento: '',
   vtvVencimiento: '',
   ultimoServiceFecha: '',
@@ -34,28 +54,67 @@ const emptyForm = {
   capacidadLitros: '',
 };
 
+// Campos completos que se pueden tocar desde "Editar" — la idea es que
+// ningún dato cargado en el alta quede después imposible de corregir.
+const emptyEditForm = {
+  codigoInterno: '',
+  patente: '',
+  nombre: '',
+  marca: '',
+  modelo: '',
+  anio: '',
+  categoria: 'camionetas' as CategoriaActivo,
+  subgrupo: '',
+  tipoCombustible: 'diesel' as TipoCombustibleCarga,
+  centroCostoId: '',
+  responsableNombre: '',
+  estado: 'activo' as EstadoActivo,
+  observaciones: '',
+  propietarioId: '',
+  capacidadTanqueLitros: '',
+  seguroVencimiento: '',
+  vtvVencimiento: '',
+  ultimoServiceFecha: '',
+  proximoServiceFecha: '',
+};
+
 export function ActivosList() {
   const qc = useQueryClient();
+  const { user, perfil } = useAuth();
+  const esAdministracion = perfil?.rol === 'administracion';
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaActivo | 'todas'>('todas');
+  const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroCentroCosto, setFiltroCentroCosto] = useState('');
+  const [filtroPropietario, setFiltroPropietario] = useState('');
+  const [soloVencimientosProximos, setSoloVencimientosProximos] = useState(false);
+
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [historialId, setHistorialId] = useState<string | null>(null);
+
   const [importando, setImportando] = useState<FilaImportada[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [editForm, setEditForm] = useState({
-    estado: 'activo' as EstadoActivo,
-    seguroVencimiento: '',
-    vtvVencimiento: '',
-    ultimoServiceFecha: '',
-    proximoServiceFecha: '',
-  });
+
+  const [nuevoPropietario, setNuevoPropietario] = useState('');
 
   const { data, isLoading, isError } = useQuery({ queryKey: ['activos'], queryFn: listarActivos });
+  const centrosQ = useQuery({ queryKey: ['centrosCosto'], queryFn: listarCentrosCosto });
+  const propietariosQ = useQuery({ queryKey: ['propietarios'], queryFn: listarPropietarios });
+  const historialQ = useQuery({
+    queryKey: ['historialActivo', historialId],
+    queryFn: () => listarHistorialActivo(historialId!),
+    enabled: !!historialId,
+  });
 
   const crear = useMutation({
-    mutationFn: () =>
-      crearActivo({
+    mutationFn: () => {
+      const centro = centrosQ.data?.find((c) => c.id === form.centroCostoId);
+      const propietario = propietariosQ.data?.find((p) => p.id === form.propietarioId);
+      return crearActivo({
         categoria: form.categoria,
         subgrupo: form.subgrupo,
         codigoInterno: form.codigoInterno,
@@ -67,6 +126,16 @@ export function ActivosList() {
         numeroMotor: form.numeroMotor || undefined,
         patente: form.patente || undefined,
         lugarCompra: form.lugarCompra || undefined,
+        tipoCombustible: form.tipoCombustible,
+        capacidadTanqueLitros: form.capacidadTanqueLitros ? Number(form.capacidadTanqueLitros) : undefined,
+        odometroInicial: form.odometroInicial ? Number(form.odometroInicial) : undefined,
+        odometroHorometroActual: form.odometroInicial ? Number(form.odometroInicial) : undefined,
+        responsableNombre: form.responsableNombre || undefined,
+        observaciones: form.observaciones || undefined,
+        centroCostoId: form.centroCostoId || undefined,
+        centroCostoNombre: centro?.nombre,
+        propietarioId: form.propietarioId || undefined,
+        propietarioNombre: propietario?.nombre,
         seguroVencimiento: form.seguroVencimiento ? new Date(form.seguroVencimiento).getTime() : undefined,
         vtvVencimiento: form.vtvVencimiento ? new Date(form.vtvVencimiento).getTime() : undefined,
         ultimoServiceFecha: form.ultimoServiceFecha ? new Date(form.ultimoServiceFecha).getTime() : undefined,
@@ -77,7 +146,8 @@ export function ActivosList() {
         esTanqueMovil: form.subgrupo === 'Batán' || undefined,
         capacidadLitros: form.subgrupo === 'Batán' && form.capacidadLitros ? Number(form.capacidadLitros) : undefined,
         stockActualLitros: form.subgrupo === 'Batán' ? 0 : undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['activos'] });
       setForm(emptyForm);
@@ -86,30 +156,59 @@ export function ActivosList() {
   });
 
   const editar = useMutation({
-    mutationFn: (id: string) =>
-      actualizarActivo(id, {
+    mutationFn: async (activo: Activo) => {
+      const centro = centrosQ.data?.find((c) => c.id === editForm.centroCostoId);
+      const propietario = propietariosQ.data?.find((p) => p.id === editForm.propietarioId);
+      const cambios: Partial<Activo> = {
+        codigoInterno: editForm.codigoInterno,
+        patente: editForm.patente || undefined,
+        nombre: editForm.nombre,
+        marca: editForm.marca || undefined,
+        modelo: editForm.modelo || undefined,
+        anio: editForm.anio ? Number(editForm.anio) : undefined,
+        categoria: editForm.categoria,
+        subgrupo: editForm.subgrupo,
+        tipoCombustible: editForm.tipoCombustible,
+        centroCostoId: editForm.centroCostoId || undefined,
+        centroCostoNombre: centro?.nombre,
+        responsableNombre: editForm.responsableNombre || undefined,
         estado: editForm.estado,
+        observaciones: editForm.observaciones || undefined,
+        propietarioId: editForm.propietarioId || undefined,
+        propietarioNombre: propietario?.nombre,
+        capacidadTanqueLitros: editForm.capacidadTanqueLitros ? Number(editForm.capacidadTanqueLitros) : undefined,
         seguroVencimiento: editForm.seguroVencimiento ? new Date(editForm.seguroVencimiento).getTime() : undefined,
         vtvVencimiento: editForm.vtvVencimiento ? new Date(editForm.vtvVencimiento).getTime() : undefined,
         ultimoServiceFecha: editForm.ultimoServiceFecha ? new Date(editForm.ultimoServiceFecha).getTime() : undefined,
         proximoServiceFecha: editForm.proximoServiceFecha ? new Date(editForm.proximoServiceFecha).getTime() : undefined,
-      }),
+        fechaBaja: editForm.estado === 'baja' ? Date.now() : undefined,
+      };
+      await actualizarActivo(activo.id, cambios);
+      await registrarCambiosActivo(activo.id, activo as unknown as Record<string, unknown>, cambios as Record<string, unknown>, user?.email ?? undefined, perfil?.nombre ?? user?.email ?? undefined);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['activos'] });
       setEditingId(null);
     },
   });
 
-  function abrirEdicion(a: Activo) {
-    setEditingId(a.id);
-    setEditForm({
-      estado: a.estado,
-      seguroVencimiento: toDateInput(a.seguroVencimiento),
-      vtvVencimiento: toDateInput(a.vtvVencimiento),
-      ultimoServiceFecha: toDateInput(a.ultimoServiceFecha),
-      proximoServiceFecha: toDateInput(a.proximoServiceFecha),
-    });
-  }
+  const eliminar = useMutation({
+    mutationFn: (id: string) => eliminarActivoFisico(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['activos'] }),
+  });
+
+  const crearPropietarioRapido = useMutation({
+    mutationFn: (nombre: string) => crearPropietario(nombre),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['propietarios'] });
+      setNuevoPropietario('');
+    },
+  });
+
+  const seedProp = useMutation({
+    mutationFn: seedPropietarios,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['propietarios'] }),
+  });
 
   const importar = useMutation({
     mutationFn: (filas: FilaImportada[]) => importarActivosEnLote(filas),
@@ -132,16 +231,84 @@ export function ActivosList() {
     e.target.value = '';
   }
 
+  function abrirEdicion(a: Activo) {
+    setEditingId(a.id);
+    setHistorialId(null);
+    setEditForm({
+      codigoInterno: a.codigoInterno,
+      patente: a.patente ?? '',
+      nombre: a.nombre,
+      marca: a.marca ?? '',
+      modelo: a.modelo ?? '',
+      anio: a.anio ? String(a.anio) : '',
+      categoria: a.categoria,
+      subgrupo: a.subgrupo,
+      tipoCombustible: a.tipoCombustible ?? 'diesel',
+      centroCostoId: a.centroCostoId ?? '',
+      responsableNombre: a.responsableNombre ?? '',
+      estado: a.estado,
+      observaciones: a.observaciones ?? '',
+      propietarioId: a.propietarioId ?? '',
+      capacidadTanqueLitros: a.capacidadTanqueLitros ? String(a.capacidadTanqueLitros) : '',
+      seguroVencimiento: toDateInput(a.seguroVencimiento),
+      vtvVencimiento: toDateInput(a.vtvVencimiento),
+      ultimoServiceFecha: toDateInput(a.ultimoServiceFecha),
+      proximoServiceFecha: toDateInput(a.proximoServiceFecha),
+    });
+  }
+
+  function duplicar(a: Activo) {
+    setShowForm(true);
+    setForm({
+      ...emptyForm,
+      categoria: a.categoria,
+      subgrupo: a.subgrupo,
+      nombre: a.nombre,
+      marca: a.marca ?? '',
+      modelo: a.modelo ?? '',
+      anio: a.anio ? String(a.anio) : '',
+      tipoCombustible: a.tipoCombustible ?? 'diesel',
+      lugarCompra: a.lugarCompra ?? '',
+      centroCostoId: a.centroCostoId ?? '',
+      propietarioId: a.propietarioId ?? '',
+      capacidadTanqueLitros: a.capacidadTanqueLitros ? String(a.capacidadTanqueLitros) : '',
+      // Código interno, patente, chasis y motor NO se copian a propósito
+      // — son datos únicos de cada equipo, no tendría sentido duplicarlos.
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  const activosFiltrados = useMemo(() => {
+    return (data ?? []).filter((a) => {
+      if (filtroCategoria !== 'todas' && a.categoria !== filtroCategoria) return false;
+      if (filtroEstado && a.estado !== filtroEstado) return false;
+      if (filtroCentroCosto && a.centroCostoId !== filtroCentroCosto) return false;
+      if (filtroPropietario && a.propietarioId !== filtroPropietario) return false;
+      if (soloVencimientosProximos) {
+        const vence = venceProntoOVencido(a.seguroVencimiento) || venceProntoOVencido(a.vtvVencimiento) || venceProntoOVencido(a.proximoServiceFecha);
+        if (!vence) return false;
+      }
+      return true;
+    });
+  }, [data, filtroCategoria, filtroEstado, filtroCentroCosto, filtroPropietario, soloVencimientosProximos]);
+
+  const filtrosLabel = [
+    filtroCategoria !== 'todas' && CATEGORIA_LABEL[filtroCategoria],
+    filtroEstado && ESTADO_LABEL[filtroEstado as EstadoActivo],
+    filtroCentroCosto && centrosQ.data?.find((c) => c.id === filtroCentroCosto)?.nombre,
+    filtroPropietario && propietariosQ.data?.find((p) => p.id === filtroPropietario)?.nombre,
+    soloVencimientosProximos && 'Solo vencimientos próximos',
+  ].filter(Boolean).join(' · ') || 'Sin filtros';
+
   const agrupado = useMemo(() => {
-    const activos = (data ?? []).filter((a) => filtroCategoria === 'todas' || a.categoria === filtroCategoria);
     const porCategoria: Record<string, Record<string, Activo[]>> = {};
-    for (const a of activos) {
+    for (const a of activosFiltrados) {
       porCategoria[a.categoria] ??= {};
       porCategoria[a.categoria][a.subgrupo] ??= [];
       porCategoria[a.categoria][a.subgrupo].push(a);
     }
     return porCategoria;
-  }, [data, filtroCategoria]);
+  }, [activosFiltrados]);
 
   return (
     <div>
@@ -152,16 +319,20 @@ export function ActivosList() {
         </div>
         <div className="flex gap-2">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
-          >
-            Importar desde Excel
+          <button onClick={() => fileInputRef.current?.click()}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+            Importar Excel
           </button>
-          <button
-            onClick={() => setShowForm((s) => !s)}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
-          >
+          <button onClick={() => exportarActivosExcel(activosFiltrados)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+            Exportar Excel
+          </button>
+          <button onClick={() => exportarActivosPDF(activosFiltrados, filtrosLabel)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+            Exportar PDF
+          </button>
+          <button onClick={() => setShowForm((s) => !s)}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
             {showForm ? 'Cancelar' : '+ Nuevo activo'}
           </button>
         </div>
@@ -210,18 +381,34 @@ export function ActivosList() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      {/* Filtros */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 p-3">
         {(['todas', 'automoviles', 'camionetas', 'maquinas', 'otros'] as const).map((c) => (
-          <button
-            key={c}
-            onClick={() => setFiltroCategoria(c)}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              filtroCategoria === c ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600'
-            }`}
-          >
+          <button key={c} onClick={() => setFiltroCategoria(c)}
+            className={`rounded-full border px-3 py-1 text-xs ${filtroCategoria === c ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600'}`}>
             {c === 'todas' ? 'Todas' : CATEGORIA_LABEL[c]}
           </button>
         ))}
+        <span className="mx-1 h-4 w-px bg-slate-200" />
+        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+          <option value="">Todos los estados</option>
+          {(Object.keys(ESTADO_LABEL) as EstadoActivo[]).map((e) => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+        </select>
+        <select value={filtroCentroCosto} onChange={(e) => setFiltroCentroCosto(e.target.value)}
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+          <option value="">Todos los centros de costo</option>
+          {centrosQ.data?.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <select value={filtroPropietario} onChange={(e) => setFiltroPropietario(e.target.value)}
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+          <option value="">Todos los propietarios</option>
+          {propietariosQ.data?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+        </select>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={soloVencimientosProximos} onChange={(e) => setSoloVencimientosProximos(e.target.checked)} />
+          Solo vencimientos próximos
+        </label>
       </div>
 
       {showForm && (
@@ -281,6 +468,29 @@ export function ActivosList() {
           <input placeholder="Dónde se compró" value={form.lugarCompra}
             onChange={(e) => setForm({ ...form, lugarCompra: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <select value={form.tipoCombustible} onChange={(e) => setForm({ ...form, tipoCombustible: e.target.value as TipoCombustibleCarga })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            {Object.entries(combustibleLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <input type="number" placeholder="Capacidad tanque (L)" value={form.capacidadTanqueLitros}
+            onChange={(e) => setForm({ ...form, capacidadTanqueLitros: e.target.value })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <input type="number" placeholder="Odómetro/horómetro inicial" value={form.odometroInicial}
+            onChange={(e) => setForm({ ...form, odometroInicial: e.target.value })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <select value={form.centroCostoId} onChange={(e) => setForm({ ...form, centroCostoId: e.target.value })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <option value="">Centro de costo...</option>
+            {centrosQ.data?.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+          <select value={form.propietarioId} onChange={(e) => setForm({ ...form, propietarioId: e.target.value })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <option value="">Propietario...</option>
+            {propietariosQ.data?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+          <input placeholder="Responsable" value={form.responsableNombre}
+            onChange={(e) => setForm({ ...form, responsableNombre: e.target.value })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           <label className="flex flex-col text-xs text-slate-500">
             Seguro vence
             <input type="date" value={form.seguroVencimiento}
@@ -305,6 +515,9 @@ export function ActivosList() {
               onChange={(e) => setForm({ ...form, proximoServiceFecha: e.target.value })}
               className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
           </label>
+          <textarea placeholder="Observaciones" value={form.observaciones}
+            onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+            className="col-span-2 rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-2" rows={1} />
           {form.subgrupo === 'Batán' && (
             <input required type="number" placeholder="Capacidad del Batán (L)" value={form.capacidadLitros}
               onChange={(e) => setForm({ ...form, capacidadLitros: e.target.value })}
@@ -321,7 +534,7 @@ export function ActivosList() {
       {isError && (
         <p className="text-sm text-red-500">No se pudo conectar con Firestore. Revisá las variables VITE_FIREBASE_* en tu .env.</p>
       )}
-      {data?.length === 0 && !isLoading && <p className="text-sm text-slate-400">Todavía no hay activos cargados.</p>}
+      {activosFiltrados.length === 0 && !isLoading && <p className="text-sm text-slate-400">No hay activos que coincidan con estos filtros.</p>}
 
       {Object.entries(agrupado).map(([categoria, subgrupos]) => (
         <div key={categoria} className="mb-6">
@@ -337,7 +550,7 @@ export function ActivosList() {
                     <tr>
                       <th className="px-4 py-2">Código</th>
                       <th className="px-4 py-2">Nombre</th>
-                      <th className="px-4 py-2">Patente</th>
+                      <th className="px-4 py-2">Propietario</th>
                       <th className="px-4 py-2">Seguro</th>
                       <th className="px-4 py-2">VTV</th>
                       <th className="px-4 py-2">Service</th>
@@ -358,7 +571,7 @@ export function ActivosList() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2">{a.patente ?? '—'}</td>
+                        <td className="px-4 py-2 text-slate-500">{a.propietarioNombre ?? '—'}</td>
                         <td className="px-4 py-2">
                           <span className={`rounded-full px-2 py-0.5 text-xs ${estaVigente(a.seguroVencimiento) ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                             {estaVigente(a.seguroVencimiento) ? 'Vigente' : 'Vencido / sin datos'}
@@ -379,28 +592,147 @@ export function ActivosList() {
                           )}
                         </td>
                         <td className="px-4 py-2">
-                          <span className={`rounded-full px-2 py-0.5 text-xs ${estadoClass[a.estado] ?? ''}`}>{a.estado}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs ${estadoClass[a.estado] ?? ''}`}>{ESTADO_LABEL[a.estado]}</span>
                         </td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                           <button onClick={() => (editingId === a.id ? setEditingId(null) : abrirEdicion(a))}
                             className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
                             {editingId === a.id ? 'Cerrar' : 'Editar'}
                           </button>
+                          <button onClick={() => setHistorialId(historialId === a.id ? null : a.id)}
+                            className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
+                            Historial
+                          </button>
+                          <button onClick={() => duplicar(a)} className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
+                            Duplicar
+                          </button>
+                          <button onClick={() => generarFichaActivoPDF(a)} className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
+                            Ficha PDF
+                          </button>
+                          {esAdministracion && (
+                            <button
+                              onClick={() => { if (confirm(`¿Eliminar ${a.codigoInterno} definitivamente? Esta acción no se puede deshacer.`)) eliminar.mutate(a.id); }}
+                              className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                            >
+                              Eliminar
+                            </button>
+                          )}
                         </td>
                       </tr>
+
+                      {historialId === a.id && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={8} className="px-4 py-3">
+                            <p className="mb-2 text-xs font-medium text-slate-600">Historial de modificaciones</p>
+                            {historialQ.isLoading && <p className="text-xs text-slate-400">Cargando...</p>}
+                            {historialQ.data?.length === 0 && <p className="text-xs text-slate-400">Todavía no se registró ninguna edición.</p>}
+                            <ul className="space-y-1">
+                              {historialQ.data?.map((h) => (
+                                <li key={h.id} className="text-xs text-slate-600">
+                                  <span className="font-mono-data text-slate-400">{new Date(h.fecha).toLocaleString('es-AR')}</span>{' '}
+                                  — <strong>{h.usuarioNombre ?? h.usuarioEmail ?? 'alguien'}</strong> cambió <strong>{h.campo}</strong>:{' '}
+                                  <span className="text-red-500 line-through">{h.valorAnterior}</span> → <span className="text-green-600">{h.valorNuevo}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      )}
+
                       {editingId === a.id && (
                         <tr className="bg-slate-50">
                           <td colSpan={8} className="px-4 py-3">
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Código interno
+                                <input value={editForm.codigoInterno} onChange={(e) => setEditForm({ ...editForm, codigoInterno: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Patente
+                                <input value={editForm.patente} onChange={(e) => setEditForm({ ...editForm, patente: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500 sm:col-span-2">
+                                Nombre
+                                <input value={editForm.nombre} onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Categoría
+                                <select value={editForm.categoria}
+                                  onChange={(e) => {
+                                    const categoria = e.target.value as CategoriaActivo;
+                                    setEditForm({ ...editForm, categoria, subgrupo: SUBGRUPOS[categoria][0] });
+                                  }}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  {(Object.keys(CATEGORIA_LABEL) as CategoriaActivo[]).map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Subgrupo
+                                <select value={editForm.subgrupo} onChange={(e) => setEditForm({ ...editForm, subgrupo: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  {SUBGRUPOS[editForm.categoria].map((s) => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Marca
+                                <select value={editForm.marca ?? ''} onChange={(e) => setEditForm({ ...editForm, marca: e.target.value } as any)}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  <option value="">Marca...</option>
+                                  {MARCAS[editForm.categoria].map((m) => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Modelo
+                                <input value={editForm.modelo ?? ''} onChange={(e) => setEditForm({ ...editForm, modelo: e.target.value.toUpperCase() } as any)}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm uppercase text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Año
+                                <input type="number" value={editForm.anio ?? ''} onChange={(e) => setEditForm({ ...editForm, anio: e.target.value } as any)}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Tipo de combustible
+                                <select value={editForm.tipoCombustible} onChange={(e) => setEditForm({ ...editForm, tipoCombustible: e.target.value as TipoCombustibleCarga })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  {Object.entries(combustibleLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Centro de costo
+                                <select value={editForm.centroCostoId} onChange={(e) => setEditForm({ ...editForm, centroCostoId: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  <option value="">Sin asignar</option>
+                                  {centrosQ.data?.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Propietario
+                                <select value={editForm.propietarioId} onChange={(e) => setEditForm({ ...editForm, propietarioId: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
+                                  <option value="">Sin asignar</option>
+                                  {propietariosQ.data?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                                </select>
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Responsable
+                                <input value={editForm.responsableNombre} onChange={(e) => setEditForm({ ...editForm, responsableNombre: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
+                              <label className="flex flex-col text-xs text-slate-500">
+                                Capacidad tanque (L)
+                                <input type="number" value={editForm.capacidadTanqueLitros} onChange={(e) => setEditForm({ ...editForm, capacidadTanqueLitros: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
+                              </label>
                               <label className="flex flex-col text-xs text-slate-500">
                                 Estado
                                 <select value={editForm.estado}
                                   onChange={(e) => setEditForm({ ...editForm, estado: e.target.value as EstadoActivo })}
                                   className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900">
-                                  <option value="activo">Activo</option>
-                                  <option value="en_mantenimiento">En mantenimiento</option>
-                                  <option value="inactivo">Inactivo</option>
-                                  <option value="baja">Baja</option>
+                                  {(Object.keys(ESTADO_LABEL) as EstadoActivo[]).map((e) => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
                                 </select>
                               </label>
                               <label className="flex flex-col text-xs text-slate-500">
@@ -427,8 +759,13 @@ export function ActivosList() {
                                   onChange={(e) => setEditForm({ ...editForm, proximoServiceFecha: e.target.value })}
                                   className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" />
                               </label>
+                              <label className="flex flex-col text-xs text-slate-500 sm:col-span-2">
+                                Observaciones
+                                <textarea value={editForm.observaciones} onChange={(e) => setEditForm({ ...editForm, observaciones: e.target.value })}
+                                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900" rows={1} />
+                              </label>
                             </div>
-                            <button onClick={() => editar.mutate(a.id)} disabled={editar.isPending}
+                            <button onClick={() => editar.mutate(a)} disabled={editar.isPending}
                               className="mt-3 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
                               {editar.isPending ? 'Guardando...' : 'Guardar cambios'}
                             </button>
@@ -444,6 +781,30 @@ export function ActivosList() {
           ))}
         </div>
       ))}
+
+      {/* Catálogo de propietarios, discreto al pie */}
+      <div className="mt-6 rounded-lg border border-dashed border-slate-200 p-3">
+        <p className="mb-2 text-xs text-slate-500">Catálogo de propietarios</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {propietariosQ.data?.length === 0 && (
+            <button onClick={() => seedProp.mutate()} disabled={seedProp.isPending}
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
+              Cargar catálogo básico (Empresa, Alquilado, Cliente, Contratista)
+            </button>
+          )}
+          {propietariosQ.data?.map((p) => (
+            <span key={p.id} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{p.nombre}</span>
+          ))}
+          <input placeholder="Agregar propietario..." value={nuevoPropietario} onChange={(e) => setNuevoPropietario(e.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs" />
+          <button
+            onClick={() => nuevoPropietario.trim() && crearPropietarioRapido.mutate(nuevoPropietario.trim())}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+          >
+            + Agregar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -99,6 +99,14 @@ cualquier lectura o escritura — sin login, la app no trae ni un dato.
 - **Usuarios**: alta de usuarios con rol, sin desloguear al admin que los crea
 - **Solicitudes**: corregido para que quede registrado el usuario que pide (nombre, no un campo libre) y la fecha se elige con un date picker. Un Empleado ve solo sus propias solicitudes; Administración las ve y aprueba/rechaza todas.
 - **Activos**: alta agrupada por categoría (Automóviles/Camionetas/Máquinas/Otros) y subgrupo, con todos los datos técnicos (chasis, motor, patente, dónde se compró) y las fechas de seguro, VTV y service — cada una calcula sola si está vigente o por vencer. El **Batán es un Activo más** (categoría Otros, subgrupo "Batán"): al darlo de alta se le carga su capacidad en litros y queda con stock propio.
+  - **Edición completa**: todos los campos del alta se pueden corregir después (código, patente, categoría/subgrupo, marca, modelo, año, tipo de combustible, centro de costo, propietario, responsable, estado, observaciones, vencimientos).
+  - **Historial de modificaciones**: cada edición queda auditada (quién, cuándo, qué campo, valor anterior y nuevo) — botón "Historial" en cada fila.
+  - **Estados ampliados**: Activo, En mantenimiento, Fuera de servicio, Alquilado, De baja. Un equipo "De baja" ya no aparece como opción al crear Solicitudes o Transferencias.
+  - **Propietario**: catálogo editable (Empresa, Alquilado, Cliente, Contratista, o lo que agregues) para saber de quién es cada equipo.
+  - **Filtros** por categoría, estado, centro de costo, propietario y "solo vencimientos próximos", con **exportación a Excel y PDF** (el PDF lleva encabezado, fecha, total de activos y numeración de página).
+  - **Ficha individual en PDF** por activo (botón "Ficha PDF" en cada fila) para inspecciones o auditorías.
+  - **Duplicar** un activo para dar de alta uno parecido sin repetir todos los datos a mano.
+  - **Importar desde Excel**: botón para cargar equipos en lote desde un archivo con columnas EQUIPO/MARCA/MODELO/TITULAR/AÑO/N°INTERNO/DOMINIO/N°MOTOR/N°CHASIS.
 - **Centros de costo**: las 36 obras/áreas reales de tu formulario, con botón para poblarlas de una
 - **Reporte de Centros de costo**: junta Solicitudes + Órdenes de carga + Entregas del Batán en un solo listado, filtrable por fecha, centro de costo y activo, con exportación a **Excel** y **PDF**
 - **Flujo Solicitud → Orden → Entrega**:
@@ -111,6 +119,12 @@ cualquier lectura o escritura — sin login, la app no trae ni un dato.
 - Choferes/operadores, Taller, Documentación, Indicadores más completos
   (top 10 vehículos/obras por consumo, evolución mensual — hoy el
   Dashboard solo tiene las alertas de documentación)
+- En Activos: adjuntar documentación (PDF/fotos de título, póliza, VTV) y
+  foto de portada del equipo — requiere habilitar **Firebase Storage**
+  (hoy el proyecto solo usa Firestore), es un paso aparte que no hicimos
+  todavía. Logo de la empresa en el PDF exportado (falta el archivo).
+  Costos de vencimientos (seguro/VTV/service) — el campo ya existe en el
+  modelo de datos, falta la pantalla para cargarlo.
 
 ## Próximo paso sugerido
 
