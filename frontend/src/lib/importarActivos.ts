@@ -19,7 +19,7 @@ interface FilaExcel {
 // mayúsculas sueltas, espacios de más, sinónimos) a nuestra categoría y
 // subgrupo. Usa coincidencia por palabras clave en vez de un diccionario
 // exacto, porque en la práctica cada fila viene escrita un poco distinto.
-function mapearEquipo(equipoRaw: string): { categoria: CategoriaActivo; subgrupo: string; unidad: 'km' | 'horas' } {
+function mapearEquipo(equipoRaw: string): { categoria: CategoriaActivo; subgrupo: string; unidad: 'km' | 'horas' | 'no_aplica' } {
   const e = equipoRaw.toLowerCase().trim();
 
   if (e.includes('camioneta')) {
