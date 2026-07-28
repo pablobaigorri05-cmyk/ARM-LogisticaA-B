@@ -105,7 +105,7 @@ export function SolicitudesPage() {
             </button>
           )}
           <button onClick={() => setShowForm((s) => !s)}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+            className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
             {showForm ? 'Cancelar' : '+ Nueva solicitud'}
           </button>
         </div>
@@ -149,7 +149,7 @@ export function SolicitudesPage() {
             onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           <button type="submit" disabled={crear.isPending}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+            className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
             {crear.isPending ? 'Enviando...' : 'Enviar solicitud'}
           </button>
         </form>

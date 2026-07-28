@@ -35,7 +35,7 @@ export function UsuariosPage() {
           <p className="text-sm text-slate-500">Quién puede entrar al sistema y con qué rol</p>
         </div>
         <button onClick={() => setShowForm((s) => !s)}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+          className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
           {showForm ? 'Cancelar' : '+ Nuevo usuario'}
         </button>
       </div>
@@ -57,7 +57,7 @@ export function UsuariosPage() {
             {Object.entries(rolLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <button type="submit" disabled={crear.isPending}
-            className="col-span-2 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 sm:col-span-1">
+            className="col-span-2 rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 sm:col-span-1">
             {crear.isPending ? 'Creando...' : 'Crear usuario'}
           </button>
           {error && <p className="col-span-full text-sm text-red-500">{error}</p>}

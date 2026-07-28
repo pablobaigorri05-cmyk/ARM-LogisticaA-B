@@ -5,6 +5,7 @@ import { leerExcelActivos, importarActivosEnLote, FilaImportada } from '../../li
 import { listarCentrosCosto } from '../../lib/centrosCosto';
 import { listarPropietarios, seedPropietarios, crearPropietario } from '../../lib/propietarios';
 import { listarHistorialActivo, registrarCambiosActivo } from '../../lib/historialActivos';
+import { listarRegistrosPorActivo } from '../../lib/rendimiento';
 import { exportarActivosExcel, exportarActivosPDF, generarFichaActivoPDF } from '../../lib/exportActivos';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -94,6 +95,7 @@ export function ActivosList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [historialId, setHistorialId] = useState<string | null>(null);
+  const [rendimientoId, setRendimientoId] = useState<string | null>(null);
 
   const [importando, setImportando] = useState<FilaImportada[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -108,6 +110,11 @@ export function ActivosList() {
     queryKey: ['historialActivo', historialId],
     queryFn: () => listarHistorialActivo(historialId!),
     enabled: !!historialId,
+  });
+  const rendimientoQ = useQuery({
+    queryKey: ['registrosPorActivo', rendimientoId],
+    queryFn: () => listarRegistrosPorActivo(rendimientoId!),
+    enabled: !!rendimientoId,
   });
 
   const crear = useMutation({
@@ -332,7 +339,7 @@ export function ActivosList() {
             Exportar PDF
           </button>
           <button onClick={() => setShowForm((s) => !s)}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+            className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
             {showForm ? 'Cancelar' : '+ Nuevo activo'}
           </button>
         </div>
@@ -371,7 +378,7 @@ export function ActivosList() {
           </div>
           <div className="flex gap-2">
             <button onClick={() => importar.mutate(importando)} disabled={importar.isPending}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+              className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
               {importar.isPending ? 'Importando...' : `Confirmar e importar ${importando.length} equipos`}
             </button>
             <button onClick={() => setImportando(null)} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
@@ -385,7 +392,7 @@ export function ActivosList() {
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 p-3">
         {(['todas', 'automoviles', 'camionetas', 'maquinas', 'otros'] as const).map((c) => (
           <button key={c} onClick={() => setFiltroCategoria(c)}
-            className={`rounded-full border px-3 py-1 text-xs ${filtroCategoria === c ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600'}`}>
+            className={`rounded-full border px-3 py-1 text-xs ${filtroCategoria === c ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 text-slate-600'}`}>
             {c === 'todas' ? 'Todas' : CATEGORIA_LABEL[c]}
           </button>
         ))}
@@ -524,7 +531,7 @@ export function ActivosList() {
               className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           )}
           <button type="submit" disabled={crear.isPending}
-            className="col-span-2 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 sm:col-span-1">
+            className="col-span-2 rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 sm:col-span-1">
             {crear.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </form>
@@ -603,6 +610,10 @@ export function ActivosList() {
                             className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
                             Historial
                           </button>
+                          <button onClick={() => setRendimientoId(rendimientoId === a.id ? null : a.id)}
+                            className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
+                            Rendimiento
+                          </button>
                           <button onClick={() => duplicar(a)} className="text-xs text-slate-500 hover:text-slate-900 hover:underline">
                             Duplicar
                           </button>
@@ -632,6 +643,37 @@ export function ActivosList() {
                                   <span className="font-mono-data text-slate-400">{new Date(h.fecha).toLocaleString('es-AR')}</span>{' '}
                                   — <strong>{h.usuarioNombre ?? h.usuarioEmail ?? 'alguien'}</strong> cambió <strong>{h.campo}</strong>:{' '}
                                   <span className="text-red-500 line-through">{h.valorAnterior}</span> → <span className="text-green-600">{h.valorNuevo}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      )}
+
+                      {rendimientoId === a.id && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={8} className="px-4 py-3">
+                            <p className="mb-2 text-xs font-medium text-slate-600">Rendimiento de combustible</p>
+                            {rendimientoQ.isLoading && <p className="text-xs text-slate-400">Cargando...</p>}
+                            {rendimientoQ.data?.length === 0 && <p className="text-xs text-slate-400">Todavía no hay cargas confirmadas para este equipo.</p>}
+                            {rendimientoQ.data && rendimientoQ.data.filter((r) => r.litrosPor100km !== undefined).length > 0 && (
+                              <p className="mb-2 text-xs text-slate-600">
+                                Promedio histórico:{' '}
+                                <strong>
+                                  {(
+                                    rendimientoQ.data.filter((r) => r.litrosPor100km !== undefined).reduce((acc, r) => acc + (r.litrosPor100km ?? 0), 0) /
+                                    rendimientoQ.data.filter((r) => r.litrosPor100km !== undefined).length
+                                  ).toFixed(1)} L/100km
+                                </strong>
+                              </p>
+                            )}
+                            <ul className="space-y-1">
+                              {rendimientoQ.data?.map((r) => (
+                                <li key={r.id} className={`text-xs ${r.alertaConsumo || r.alertaTanque ? 'text-amber-700' : 'text-slate-600'}`}>
+                                  <span className="font-mono-data text-slate-400">{new Date(r.fecha).toLocaleDateString('es-AR')}</span>{' '}
+                                  — odómetro {r.odometro}{r.kmRecorridos !== undefined && ` (+${r.kmRecorridos})`}, {r.litros} L
+                                  {r.litrosPor100km !== undefined && ` · ${r.litrosPor100km.toFixed(1)} L/100km`}
+                                  {(r.alertaConsumo || r.alertaTanque) && ' ⚠'}
                                 </li>
                               ))}
                             </ul>
@@ -766,7 +808,7 @@ export function ActivosList() {
                               </label>
                             </div>
                             <button onClick={() => editar.mutate(a)} disabled={editar.isPending}
-                              className="mt-3 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+                              className="mt-3 rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
                               {editar.isPending ? 'Guardando...' : 'Guardar cambios'}
                             </button>
                           </td>

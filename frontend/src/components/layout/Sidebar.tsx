@@ -13,6 +13,7 @@ const seccionesAdministracion: NavSection[] = [
       { label: 'Solicitudes', to: '/combustible/solicitudes' },
       { label: 'Órdenes de carga', to: '/combustible/ordenes' },
       { label: 'Transferencias', to: '/combustible/transferencias' },
+      { label: 'Rendimiento', to: '/combustible/rendimiento' },
     ],
   },
   {
@@ -25,13 +26,21 @@ const seccionesAdministracion: NavSection[] = [
   },
 ];
 
+function LogoEmpresa() {
+  return (
+    <div className="mb-4 px-2">
+      <img src="/logo-armegom.png" alt="Armegom" className="h-8 w-auto object-contain object-left" />
+    </div>
+  );
+}
+
 export function Sidebar() {
   const { perfil, user } = useAuth();
   const esEmpleado = perfil?.rol === 'empleado';
 
   const linkClass = (isActive: boolean) =>
-    `block rounded-md px-3 py-1.5 text-[13px] transition-colors ${
-      isActive ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-900'
+    `block rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+      isActive ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-500 hover:bg-teal-50 hover:text-teal-700'
     }`;
 
   // Un Empleado solo tiene un lugar a donde ir: Solicitudes. Ni siquiera
@@ -40,13 +49,13 @@ export function Sidebar() {
   if (esEmpleado) {
     return (
       <aside className="flex h-screen w-56 flex-shrink-0 flex-col border-r border-slate-200 bg-slate-50 px-2 py-4">
-        <div className="mb-3 px-2 font-display text-[15px] text-slate-900">Empresa</div>
+        <LogoEmpresa />
         <NavLink to="/combustible/solicitudes" className={({ isActive }) => linkClass(isActive)}>
           Solicitudes de combustible
         </NavLink>
         <div className="mt-auto border-t border-slate-200 px-2 pt-3">
           <p className="truncate text-[12px] text-slate-700">{perfil?.nombre ?? user?.email}</p>
-          <button onClick={() => logout()} className="text-[11.5px] text-slate-400 hover:text-slate-700">
+          <button onClick={() => logout()} className="text-[11.5px] text-slate-400 hover:text-teal-700">
             Cerrar sesión
           </button>
         </div>
@@ -56,7 +65,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-56 flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 px-2 py-4">
-      <div className="mb-3 px-2 font-display text-[15px] text-slate-900">Empresa</div>
+      <LogoEmpresa />
 
       <NavLink to="/" end className={({ isActive }) => linkClass(isActive) + ' mb-3'}>
         Dashboard
@@ -64,7 +73,7 @@ export function Sidebar() {
 
       {seccionesAdministracion.map((section) => (
         <div key={section.title} className="mb-3">
-          <div className="mb-1 px-3 text-[10.5px] font-medium uppercase tracking-wide text-slate-400">
+          <div className="mb-1 px-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
             {section.title}
           </div>
           <div className="space-y-0.5">
@@ -83,7 +92,7 @@ export function Sidebar() {
         </NavLink>
         <div className="mt-3 border-t border-slate-200 px-2 pt-3">
           <p className="truncate text-[12px] text-slate-700">{perfil?.nombre ?? user?.email}</p>
-          <button onClick={() => logout()} className="text-[11.5px] text-slate-400 hover:text-slate-700">
+          <button onClick={() => logout()} className="text-[11.5px] text-slate-400 hover:text-teal-700">
             Cerrar sesión
           </button>
         </div>

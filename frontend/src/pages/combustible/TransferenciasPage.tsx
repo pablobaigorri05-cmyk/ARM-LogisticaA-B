@@ -135,7 +135,7 @@ export function TransferenciasPage() {
             onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           <button type="submit" disabled={crear.isPending}
-            className="col-span-2 rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 sm:col-span-1">
+            className="col-span-2 rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 sm:col-span-1">
             {crear.isPending ? 'Registrando...' : 'Entregar'}
           </button>
           {error && <p className="col-span-full text-sm text-red-500">{error}</p>}

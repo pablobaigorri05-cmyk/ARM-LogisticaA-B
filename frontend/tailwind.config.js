@@ -4,8 +4,16 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Space Grotesk"', 'sans-serif'],
+        display: ['"Manrope"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+      },
+      colors: {
+        marca: {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          600: '#0d9488',
+          700: '#0f766e',
+        },
       },
     },
   },

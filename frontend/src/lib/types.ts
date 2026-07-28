@@ -136,6 +136,46 @@ export interface CentroCosto {
 
 export type TipoCombustibleCarga = 'diesel' | 'nafta' | 'gnc' | 'urea' | 'agua_destilada';
 
+export type NivelTanque = 'vacio' | 'cuarto' | 'mitad' | 'tres_cuartos' | 'lleno';
+
+export const NIVEL_TANQUE_LABEL: Record<NivelTanque, string> = {
+  vacio: 'Vacío',
+  cuarto: '¼',
+  mitad: '½',
+  tres_cuartos: '¾',
+  lleno: 'Lleno',
+};
+
+// El evento real de consumo: se genera SOLO al confirmar la entrega de
+// una Orden de Carga (nunca con el odómetro "informativo" que se carga
+// en la Solicitud). De acá salen todos los indicadores de rendimiento.
+export interface RegistroConsumo {
+  id: string;
+  activoId: string;
+  activoCodigo?: string;
+  ordenCargaId: string;
+  fecha: number;
+  odometro: number;
+  odometroAnterior?: number;
+  kmRecorridos?: number; // odometro - odometroAnterior (si hay carga previa del mismo activo)
+  litros: number;
+  litrosPorKm?: number;
+  litrosPor100km?: number;
+  nivelTanqueAntes?: NivelTanque;
+  alertaConsumo: boolean; // se desvía del promedio histórico más de lo tolerado
+  alertaTanque?: string; // texto de la inconsistencia detectada (tanque/litros), si hay
+  centroCostoId?: string;
+  centroCostoNombre?: string;
+  proveedorNombre?: string;
+  responsableNombre?: string;
+}
+
+// Umbral de desvío configurable (±10% por defecto) — un solo documento
+// en Firestore, no hace falta una colección para esto.
+export interface ConfiguracionRendimiento {
+  umbralDesviacionPct: number;
+}
+
 // Precio vigente por litro de cada tipo — se usa para calcular el gasto
 // devengado apenas se pide/entrega combustible, sin esperar a la factura.
 export interface PrecioCombustible {

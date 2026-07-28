@@ -56,7 +56,7 @@ export function PreciosPage() {
                   <button
                     onClick={() => guardar.mutate(tipo)}
                     disabled={guardar.isPending}
-                    className="rounded-md bg-slate-900 px-3 py-1 text-xs text-white hover:bg-slate-800"
+                    className="rounded-md bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
                   >
                     Guardar
                   </button>

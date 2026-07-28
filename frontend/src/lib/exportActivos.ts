@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import { Activo, ESTADO_LABEL, estaVigente, CATEGORIA_LABEL, CategoriaActivo } from './types';
+import { agregarEncabezadoMarca, aplicarPieATodasLasPaginas } from './pdfMarca';
 
 export function exportarActivosExcel(activos: Activo[]) {
   const datos = activos.map((a) => ({
@@ -28,33 +29,22 @@ export function exportarActivosExcel(activos: Activo[]) {
   XLSX.writeFile(libro, `activos-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-function agregarEncabezadoPie(doc: jsPDF, pagina: number, totalPaginas: number, filtrosLabel: string) {
-  const ancho = doc.internal.pageSize.getWidth();
-  const alto = doc.internal.pageSize.getHeight();
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text('Listado de Activos', 14, 10);
-  doc.text(new Date().toLocaleDateString('es-AR'), ancho - 14, 10, { align: 'right' });
-  doc.text(filtrosLabel, 14, alto - 8);
-  doc.text(`Página ${pagina} de ${totalPaginas}`, ancho - 14, alto - 8, { align: 'right' });
-  doc.setTextColor(0);
-}
-
-// Listado en PDF con encabezado/pie en cada página y numeración —
-// pensado para mandarle a Oficina Técnica. No incluye logo todavía (no
-// tenemos el archivo); se puede sumar más adelante con doc.addImage.
+// Listado en PDF con logo, encabezado/pie de marca en cada página y
+// numeración — pensado para mandarle a Oficina Técnica.
 export function exportarActivosPDF(activos: Activo[], filtrosLabel: string) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   const margin = 14;
-  let y = margin + 8;
+  let y = agregarEncabezadoMarca(doc, margin) + 4;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
+  doc.setTextColor(15, 118, 110); // teal-700
   doc.text('Listado de Activos', margin, y);
+  doc.setTextColor(0);
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Total: ${activos.length} activos`, margin, y);
+  doc.text(`Total: ${activos.length} activos · ${filtrosLabel}`, margin, y);
   y += 8;
 
   const cols = [
@@ -70,12 +60,14 @@ export function exportarActivosPDF(activos: Activo[], filtrosLabel: string) {
   ];
 
   function filaHeader(yPos: number) {
+    doc.setFillColor(13, 148, 136);
+    doc.rect(margin, yPos - 4.5, 261, 6.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    let x = margin;
+    doc.setTextColor(255);
+    let x = margin + 1;
     cols.forEach((c) => { doc.text(c.header, x, yPos); x += c.w; });
-    doc.setDrawColor(200);
-    doc.line(margin, yPos + 2, 275, yPos + 2);
+    doc.setTextColor(0);
   }
 
   let pagina = 1;
@@ -86,7 +78,7 @@ export function exportarActivosPDF(activos: Activo[], filtrosLabel: string) {
     if (y > 190) {
       doc.addPage();
       pagina++;
-      y = margin + 8;
+      y = agregarEncabezadoMarca(doc, margin) + 10;
       filaHeader(y);
       y += 6;
     }
@@ -108,12 +100,7 @@ export function exportarActivosPDF(activos: Activo[], filtrosLabel: string) {
     y += 6;
   }
 
-  const totalPaginas = pagina;
-  for (let p = 1; p <= totalPaginas; p++) {
-    doc.setPage(p);
-    agregarEncabezadoPie(doc, p, totalPaginas, filtrosLabel);
-  }
-
+  aplicarPieATodasLasPaginas(doc);
   doc.save(`activos-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -122,28 +109,34 @@ export function exportarActivosPDF(activos: Activo[], filtrosLabel: string) {
 export function generarFichaActivoPDF(activo: Activo) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 20;
-  let y = margin;
+  let y = agregarEncabezadoMarca(doc, margin) + 8;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
+  doc.setTextColor(15, 118, 110); // teal-700
   doc.text('Ficha de Activo', margin, y);
+  doc.setTextColor(0);
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(120);
   doc.text(`Emitido el ${new Date().toLocaleDateString('es-AR')}`, margin, y);
   doc.setTextColor(0);
-  y += 10;
-  doc.setDrawColor(200);
+  y += 8;
+  doc.setDrawColor(13, 148, 136);
+  doc.setLineWidth(0.6);
   doc.line(margin, y, 190, y);
+  doc.setLineWidth(0.2);
   y += 8;
 
   function seccion(titulo: string) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.setFillColor(240, 240, 240);
+    doc.setFillColor(204, 251, 241); // teal-100
     doc.rect(margin, y - 5, 170, 7, 'F');
+    doc.setTextColor(15, 118, 110); // teal-700
     doc.text(titulo, margin + 2, y);
+    doc.setTextColor(0);
     y += 9;
   }
   function fila(label: string, valor: string) {
@@ -184,6 +177,7 @@ export function generarFichaActivoPDF(activo: Activo) {
   const obs = doc.splitTextToSize(activo.observaciones || 'Sin observaciones.', 170);
   doc.text(obs, margin, y);
 
+  aplicarPieATodasLasPaginas(doc);
   doc.save(`ficha-${activo.codigoInterno}.pdf`);
 }
 

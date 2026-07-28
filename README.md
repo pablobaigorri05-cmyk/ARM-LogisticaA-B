@@ -114,6 +114,15 @@ cualquier lectura o escritura — sin login, la app no trae ni un dato.
   - **Órdenes de carga** (`OC-000001`...): SOLO se generan desde una solicitud aprobada (nunca sueltas), copian sus datos, y quedan con estado pendiente/enviada/utilizada/vencida/cancelada. Se descargan en PDF para mandarle al proveedor (por ahora Axion Clavero, preparado para sumar más).
   - **Confirmar entrega**: si la orden es para el Batán, confirmar la entrega le suma esos litros a su stock. Si es para otro vehículo (cargado directo en el surtidor), no hay stock que tocar.
 - **Transferencias** (Movimientos del Batán): entregas de litros del Batán a otros activos — descuenta su stock con una transacción de Firestore, valida que no se entregue más de lo que hay, y deja registrado responsable/centro de costo/km/observaciones de cada entrega.
+- **Rendimiento de combustible** (nuevo módulo): el odómetro que se carga en la Solicitud es solo informativo — el que cuenta es el que se confirma al cerrar una Orden de Carga ("Confirmar entrega"), junto con los litros realmente cargados y el nivel de tanque antes de cargar (Vacío/¼/½/¾/Lleno).
+  - Calcula automáticamente **km recorridos**, **litros/km** y **litros/100km** comparando contra la carga anterior del mismo equipo.
+  - Guarda el **historial completo** de consumos por activo y su **promedio histórico**.
+  - **Alerta de desvío** configurable (±10% por defecto, editable) cuando una carga se aleja demasiado del promedio del equipo.
+  - **Alerta de tanque**: cruza la capacidad declarada del activo, el nivel de tanque antes de cargar y los litros realmente cargados (ej. "tanque vacío" pero cargó muy pocos litros, o cargó más de lo que entra).
+  - Pantalla propia (Combustible → Rendimiento) con filtros por fecha/centro de costo/proveedor/responsable, ranking de mejor y peor rendimiento, gráfico de evolución por equipo, y listado de alertas.
+  - Los mismos indicadores (promedio y últimas cargas) también aparecen en la ficha de cada activo (botón "Rendimiento" en Activos), y el conteo de alertas está en el Dashboard.
+- **Identidad visual de Armegom**: tipografía de títulos Manrope, acento **teal** en botones primarios, chips activos, sidebar y login (antes gris plano), logo real de la empresa en el sidebar, en el login y como favicon, y pie de página "Desarrollado por Cr. Baigorri Pablo · Estudio A&B Servicios Contables" en todas las pantallas internas y en el login.
+- **Los PDF también llevan la marca**: el listado y ficha de Activos, la orden de carga para el proveedor y el reporte de combustible tienen el logo real en el encabezado, el mismo verde teal en títulos/encabezados de tabla, y el mismo pie de página con numeración — quedan con formato consistente con el resto de la app.
 
 **Pendiente:**
 - Choferes/operadores, Taller, Documentación, Indicadores más completos

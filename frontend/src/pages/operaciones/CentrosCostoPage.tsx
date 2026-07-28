@@ -68,7 +68,7 @@ export function CentrosCostoPage() {
             )}
             <button
               onClick={() => setShowForm((s) => !s)}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
+              className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700"
             >
               {showForm ? 'Cancelar' : '+ Nuevo'}
             </button>
@@ -78,11 +78,11 @@ export function CentrosCostoPage() {
 
       <div className="mb-4 flex gap-2">
         <button onClick={() => setTab('lista')}
-          className={`rounded-full border px-3 py-1 text-xs ${tab === 'lista' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600'}`}>
+          className={`rounded-full border px-3 py-1 text-xs ${tab === 'lista' ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 text-slate-600'}`}>
           Lista
         </button>
         <button onClick={() => setTab('reporte')}
-          className={`rounded-full border px-3 py-1 text-xs ${tab === 'reporte' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600'}`}>
+          className={`rounded-full border px-3 py-1 text-xs ${tab === 'reporte' ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 text-slate-600'}`}>
           Reporte
         </button>
       </div>
@@ -105,7 +105,7 @@ export function CentrosCostoPage() {
             <option value="area_interna">Área interna</option>
           </select>
           <button type="submit" disabled={crear.isPending}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+            className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
             {crear.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </form>

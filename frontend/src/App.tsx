@@ -8,6 +8,7 @@ import { TransferenciasPage } from './pages/combustible/TransferenciasPage';
 import { SolicitudesPage } from './pages/combustible/SolicitudesPage';
 import { OrdenesCargaPage } from './pages/combustible/OrdenesCargaPage';
 import { CentrosCostoPage } from './pages/operaciones/CentrosCostoPage';
+import { RendimientoPage } from './pages/operaciones/RendimientoPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { UsuariosPage } from './pages/configuracion/UsuariosPage';
 import { PreciosPage } from './pages/configuracion/PreciosPage';
@@ -26,6 +27,7 @@ export default function App() {
 
         <Route path="/combustible/ordenes" element={<RoleGuard allow={['administracion']}><OrdenesCargaPage /></RoleGuard>} />
         <Route path="/combustible/transferencias" element={<RoleGuard allow={['administracion']}><TransferenciasPage /></RoleGuard>} />
+        <Route path="/combustible/rendimiento" element={<RoleGuard allow={['administracion']}><RendimientoPage /></RoleGuard>} />
 
         <Route path="/operaciones/centros-costo" element={<RoleGuard allow={['administracion']}><CentrosCostoPage /></RoleGuard>} />
 

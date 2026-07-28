@@ -7,6 +7,14 @@
         { "fieldPath": "activoId", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "registrosConsumo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

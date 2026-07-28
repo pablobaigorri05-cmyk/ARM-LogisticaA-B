@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { listarActivos } from '../../lib/activos';
 import { listarTanquesMoviles, listarMovimientosBatan } from '../../lib/batan';
 import { listarSolicitudes } from '../../lib/solicitudes';
+import { listarRegistrosConsumo } from '../../lib/rendimiento';
 import { Gauge } from '../../components/Gauge';
 import { Activo, estaVigente, venceProntoOVencido } from '../../lib/types';
 
@@ -48,6 +49,8 @@ export function Dashboard() {
   const tanquesQ = useQuery({ queryKey: ['tanquesMoviles'], queryFn: listarTanquesMoviles });
   const solicitudesQ = useQuery({ queryKey: ['solicitudes'], queryFn: listarSolicitudes });
   const movimientosQ = useQuery({ queryKey: ['movimientosBatan'], queryFn: listarMovimientosBatan });
+  const registrosQ = useQuery({ queryKey: ['registrosConsumo'], queryFn: listarRegistrosConsumo });
+  const alertasRendimiento = (registrosQ.data ?? []).filter((r) => r.alertaConsumo || r.alertaTanque);
 
   const activos = activosQ.data ?? [];
   const tanques = tanquesQ.data ?? [];
@@ -65,7 +68,7 @@ export function Dashboard() {
     <div>
       <h1 className="mb-4 font-display text-xl text-slate-900">Dashboard</h1>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-6">
         <div className="rounded-lg bg-slate-50 p-4">
           <p className="mb-1 text-[11px] text-slate-500">Activos</p>
           <p className="font-mono-data text-xl text-slate-900">{activos.length}</p>
@@ -77,6 +80,10 @@ export function Dashboard() {
         <div className="rounded-lg bg-emerald-50 p-4">
           <p className="mb-1 text-[11px] text-emerald-700">Gasto devengado</p>
           <p className="font-mono-data text-xl text-emerald-700">${gastoDevengado.toLocaleString('es-AR')}</p>
+        </div>
+        <div className="rounded-lg bg-amber-50 p-4">
+          <p className="mb-1 text-[11px] text-amber-700">Alertas de rendimiento</p>
+          <p className="font-mono-data text-xl text-amber-700">{alertasRendimiento.length}</p>
         </div>
         <div className="rounded-lg bg-red-50 p-4">
           <p className="mb-1 text-[11px] text-red-700">Docs vencidos</p>
@@ -117,6 +124,23 @@ export function Dashboard() {
                 <span className="font-mono-data text-xs text-amber-700">
                   {a.proximoServiceFecha ? new Date(a.proximoServiceFecha).toLocaleDateString('es-AR') : '—'}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {alertasRendimiento.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[13px] text-amber-700">Alertas de rendimiento</p>
+            <Link to="/combustible/rendimiento" className="text-xs text-amber-700 hover:underline">Ver todas →</Link>
+          </div>
+          <ul className="space-y-1">
+            {alertasRendimiento.slice(0, 5).map((r) => (
+              <li key={r.id} className="flex items-center justify-between text-sm">
+                <span className="text-amber-800">{r.activoCodigo} {r.alertaTanque ? '· inconsistencia de tanque' : '· desvío de consumo'}</span>
+                <span className="font-mono-data text-xs text-amber-700">{new Date(r.fecha).toLocaleDateString('es-AR')}</span>
               </li>
             ))}
           </ul>

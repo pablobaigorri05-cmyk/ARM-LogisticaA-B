@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { listarSolicitudes } from './solicitudes';
 import { listarOrdenes } from './ordenesCarga';
 import { listarMovimientosBatan } from './batan';
+import { agregarEncabezadoMarca, aplicarPieATodasLasPaginas } from './pdfMarca';
 
 export interface FilaReporte {
   fecha: number;
@@ -92,11 +93,13 @@ export function exportarReporteExcel(filas: FilaReporte[]) {
 export function exportarReportePDF(filas: FilaReporte[], filtrosLabel: string) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   const margin = 14;
-  let y = margin;
+  let y = agregarEncabezadoMarca(doc, margin) + 4;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
+  doc.setTextColor(15, 118, 110); // teal-700
   doc.text('Reporte de combustible', margin, y);
+  doc.setTextColor(0);
   y += 7;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -115,26 +118,36 @@ export function exportarReportePDF(filas: FilaReporte[], filtrosLabel: string) {
     { header: 'Estado', w: 30 },
   ];
 
-  function fila(y: number, valores: string[], bold = false) {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+  function filaHeader(yPos: number) {
+    doc.setFillColor(13, 148, 136);
+    doc.rect(margin, yPos - 4.5, 266, 6.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(255);
+    let x = margin + 1;
+    cols.forEach((c) => { doc.text(c.header, x, yPos); x += c.w; });
+    doc.setTextColor(0);
+  }
+
+  function fila(yPos: number, valores: string[]) {
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     let x = margin;
     valores.forEach((v, i) => {
-      doc.text(v, x, y);
+      doc.text(v, x, yPos);
       x += cols[i].w;
     });
   }
 
-  fila(y, cols.map((c) => c.header), true);
-  y += 2;
-  doc.setDrawColor(200);
-  doc.line(margin, y, 280, y);
-  y += 5;
+  filaHeader(y);
+  y += 6;
 
   for (const f of filas) {
-    if (y > 200) {
+    if (y > 190) {
       doc.addPage();
-      y = margin;
+      y = agregarEncabezadoMarca(doc, margin) + 10;
+      filaHeader(y);
+      y += 6;
     }
     fila(y, [
       new Date(f.fecha).toLocaleDateString('es-AR'),
@@ -148,5 +161,6 @@ export function exportarReportePDF(filas: FilaReporte[], filtrosLabel: string) {
     y += 6;
   }
 
+  aplicarPieATodasLasPaginas(doc);
   doc.save(`reporte-combustible-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

@@ -61,7 +61,7 @@ export function ReporteCombustible() {
           {activosQ.data?.map((a) => <option key={a.id} value={a.codigoInterno}>{a.codigoInterno} · {a.nombre}</option>)}
         </select>
         <button type="submit" disabled={buscar.isPending}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800">
+          className="rounded-md bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700">
           {buscar.isPending ? 'Buscando...' : 'Filtrar'}
         </button>
       </form>

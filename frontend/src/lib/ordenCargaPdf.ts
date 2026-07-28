@@ -1,16 +1,19 @@
 import { jsPDF } from 'jspdf';
 import { Activo, OrdenCarga } from './types';
+import { agregarEncabezadoMarca, aplicarPieATodasLasPaginas } from './pdfMarca';
 
 // PDF de la Orden de Carga — formato limpio pensado para mandarle
 // directo al proveedor (Axion Clavero) por mail o WhatsApp.
 export function generarPdfOrdenDeCarga(orden: OrdenCarga, activo?: Activo) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 20;
-  let y = margin;
+  let y = agregarEncabezadoMarca(doc, margin) + 10;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
+  doc.setTextColor(15, 118, 110); // teal-700
   doc.text('Orden de Carga', margin, y);
+  doc.setTextColor(0);
   y += 10;
 
   doc.setFontSize(11);
@@ -24,8 +27,10 @@ export function generarPdfOrdenDeCarga(orden: OrdenCarga, activo?: Activo) {
   }
   y += 10;
 
-  doc.setDrawColor(200);
+  doc.setDrawColor(13, 148, 136);
+  doc.setLineWidth(0.6);
   doc.line(margin, y, 190, y);
+  doc.setLineWidth(0.2);
   y += 8;
 
   const filas: [string, string][] = [
@@ -56,5 +61,6 @@ export function generarPdfOrdenDeCarga(orden: OrdenCarga, activo?: Activo) {
   doc.text('Firma responsable', margin, y);
   doc.text('Firma proveedor', 120, y);
 
+  aplicarPieATodasLasPaginas(doc);
   doc.save(`orden-carga-OC-${String(orden.numero ?? 0).padStart(6, '0')}.pdf`);
 }
